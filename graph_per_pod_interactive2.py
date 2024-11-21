@@ -58,16 +58,44 @@ app.layout = html.Div([
             marks={i: str(i) for i in range(1, 51, 5)}
         )
     ]),
+    html.Div([
+        html.Label("Select Graph Type:"),
+        dcc.Dropdown(
+            id="graph_type",
+            options=[
+                {"label": "Line Chart", "value": "lines"},
+                {"label": "Stacked Area Chart", "value": "area_stacked"},
+                {"label": "Stack Bar Chart", "value": "bar_stacked"},
+            ],
+            value="lines",
+            clearable=False,
+        )
+    ]),
     dcc.Graph(id="pod-usage-graph"),
 ])
+
 
 # Callback to update the graph based on inputs
 @app.callback(
     Output("pod-usage-graph", "figure"),
-    [Input("metric", "value"), Input("top_n", "value")]
+    [Input("metric", "value"), Input("top_n", "value"), Input("graph_type", "value")]
 )
+def update_graph(metric, top_n, graph_type):
+    """
+    Dynamically switch between graph types based on the selected option.
+    """
+    if graph_type == "lines":
+        return update_graph_lines(metric, top_n)
+    elif graph_type == "area_stacked":
+        return update_graph_area_stacked(metric, top_n)
+    elif graph_type == "bar_stacked":
+        return update_graph_bar(metric, top_n)
+    else:
+        # Default fallback (shouldn't happen with valid options)
+        return {"data": [], "layout": {"title": "Invalid Graph Type"}}
 
-def update_graph_area(metric, top_n):
+
+def update_graph_area_stacked(metric, top_n):
     """
     Update the graph based on the selected metric and top N pods.
     Displays data as a stacked area chart.
@@ -155,7 +183,7 @@ def update_graph_bar(metric, top_n):
     return {"data": traces, "layout": layout}
 
 
-def update_graph_line(metric, top_n):
+def update_graph_lines(metric, top_n):
     """
     Update the graph based on the selected metric and top N pods.
     """
