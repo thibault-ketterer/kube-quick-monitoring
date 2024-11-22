@@ -1,4 +1,5 @@
 
+import os
 from dash import Dash, dcc, html, Input, Output
 import plotly.graph_objs as go
 import pandas as pd
@@ -6,9 +7,7 @@ import pandas as pd
 # Initialize Dash app
 app = Dash(__name__)
 
-from graph_per_pod_interactive import load_data
-# Load data once
-
+base_dir = "data"
 data = None
 
 def get_top_pods(df, metric="cpu_mcpu", top_n=20):
@@ -33,9 +32,30 @@ def get_top_pods(df, metric="cpu_mcpu", top_n=20):
     return df[df["pod_name"].isin(top_pods)]
 
 
+# Helper function to get the available files
+def get_available_files():
+    files = []
+    for year_month in os.listdir(base_dir):
+        month_dir = os.path.join(base_dir, year_month)
+        if os.path.isdir(month_dir):
+            for file in os.listdir(month_dir):
+                if file.startswith("pod_metrics_") and file.endswith(".csv"):
+                    files.append(os.path.join(year_month, file))
+    return sorted(files)
+
 # Layout for the Dash app
 app.layout = html.Div([
     html.H1("Top Pods Resource Usage"),
+    html.Div([
+        html.Label("Select Date File:"),
+        dcc.Dropdown(
+            id="file_selector",
+            options=[{"label": f, "value": f} for f in get_available_files()],
+            value=None,
+            placeholder="Select a date file for analysis",
+            clearable=False,
+        )
+    ]),
     html.Div([
         html.Label("Select Metric:"),
         dcc.Dropdown(
@@ -75,18 +95,33 @@ app.layout = html.Div([
     dcc.Graph(id="pod-usage-graph"),
 ])
 
+# Function to load data based on selected file
+def load_data(selected_file):
+    if selected_file is not None:
+        input_file = os.path.join(base_dir, selected_file)
+        # Read the CSV file
+        df = pd.read_csv(input_file)
 
-# Callback to update the graph based on inputs
+        # Ensure timestamp is sorted for smooth plotting
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        df = df.sort_values(by="timestamp")
+        return df
+    return pd.DataFrame()
+
+# Callback to update the graph based on user inputs
 @app.callback(
     Output("pod-usage-graph", "figure"),
-    [Input("metric", "value"), Input("top_n", "value"), Input("graph_type", "value")]
+    Input("file_selector", "value"),
+    Input("metric", "value"),
+    Input("top_n", "value"),
+    Input("graph_type", "value")
 )
-def update_graph(metric, top_n, graph_type):
+def update_graph(selected_file, metric, top_n, graph_type):
     """
     Dynamically switch between graph types based on the selected option.
     """
     global data
-    data = load_data()
+    data = load_data(selected_file)
 
     if graph_type == "lines":
         return update_graph_lines(metric, top_n)
