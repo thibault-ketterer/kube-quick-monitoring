@@ -1,4 +1,3 @@
-
 import os
 from dash import Dash, dcc, html, Input, Output
 import plotly.graph_objs as go
@@ -48,6 +47,15 @@ app.layout = html.Div([
             placeholder="Select a namespace",
             clearable=True,
             multi=True,
+        )
+    ]),
+    html.Div([
+        html.Label("Search Pod Name:"),
+        dcc.Input(
+            id="pod_name_search",
+            type="text",
+            placeholder="Enter pod name for partial match",
+            debounce=True,
         )
     ]),
     html.Div([
@@ -135,11 +143,12 @@ def update_namespace_options(selected_file):
     Output("pod-usage-graph", "figure"),
     Input("file_selector", "value"),
     Input("namespace_selector", "value"),
+    Input("pod_name_search", "value"),
     Input("metric", "value"),
     Input("top_n", "value"),
     Input("graph_type", "value")
 )
-def update_graph(selected_file, namespace, metric, top_n, graph_type):
+def update_graph(selected_file, namespace, pod_name_search, metric, top_n, graph_type):
     """
     Dynamically switch between graph types based on the selected option.
     """
@@ -152,6 +161,10 @@ def update_graph(selected_file, namespace, metric, top_n, graph_type):
         else:
             data = data[data["namespace"].isin(namespace)]
 
+    # Filter by pod name using partial match if search term is provided
+    if pod_name_search:
+        data = data[data["pod_name"].str.contains(pod_name_search, case=False, na=False)]
+
     setdata(data)
 
     if graph_type == "lines":
@@ -163,7 +176,6 @@ def update_graph(selected_file, namespace, metric, top_n, graph_type):
     else:
         # Default fallback (shouldn't happen with valid options)
         return {"data": [], "layout": {"title": "Invalid Graph Type"}}
-
 
 
 if __name__ == "__main__":
