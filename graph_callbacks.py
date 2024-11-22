@@ -37,21 +37,7 @@ def update_graph_area_stacked(metric, top_n):
     Update the graph based on the selected metric and top N pods.
     Displays data as a stacked area chart with a 5-minute average.
     """
-    # Filter the top N pods
-    filtered_data = get_top_pods(data, metric=metric, top_n=top_n)
-
-    # Ensure data is sorted by timestamp
-    filtered_data["timestamp"] = pd.to_datetime(filtered_data["timestamp"])
-    filtered_data = filtered_data.sort_values(by="timestamp")
-
-    # Compute 5-minute averages while preserving spikes
-    filtered_data = (
-        filtered_data.set_index("timestamp")
-        .groupby("pod_name")[metric]
-        .resample("5min")
-        .max()
-        .reset_index()
-    )
+    filtered_data = all_filters(data, metric=metric, top_n=top_n)
 
     # Sort pods by the total metric to ensure the biggest consumer is on top
     pod_totals = filtered_data.groupby("pod_name")[metric].sum().sort_values(ascending=False)
@@ -87,18 +73,17 @@ def update_graph_area_stacked(metric, top_n):
 
     return {"data": traces, "layout": layout}
 
-
-# bar mode
-def update_graph_bar(metric, top_n):
+def all_filters(data, metric, top_n):
     """
-    Update the graph based on the selected metric and top N pods.
-    Displays data as a stacked bar chart with a 5-minute average.
+    apply top pod filter
+    then apply resample on 5 minutes
     """
     # Filter the top N pods
     filtered_data = get_top_pods(data, metric=metric, top_n=top_n)
 
     # Ensure data is sorted by timestamp
-    filtered_data["timestamp"] = pd.to_datetime(filtered_data["timestamp"])
+    # filtered_data["timestamp"] = pd.to_datetime(filtered_data["timestamp"])
+    filtered_data.loc[:, "timestamp"] = pd.to_datetime(filtered_data["timestamp"])
     filtered_data = filtered_data.sort_values(by="timestamp")
 
     # Compute 5-minute averages while preserving spikes
@@ -109,6 +94,16 @@ def update_graph_bar(metric, top_n):
         .max()
         .reset_index()
     )
+    return filtered_data
+
+
+# bar mode
+def update_graph_bar(metric, top_n):
+    """
+    Update the graph based on the selected metric and top N pods.
+    Displays data as a stacked bar chart with a 5-minute average.
+    """
+    filtered_data = all_filters(data, metric=metric, top_n=top_n)
 
     # Create bar traces for each pod
     traces = []
