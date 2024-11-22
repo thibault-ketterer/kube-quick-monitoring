@@ -8,7 +8,8 @@ app = Dash(__name__)
 
 from graph_per_pod_interactive import load_data
 # Load data once
-data = load_data()
+
+data = None
 
 def get_top_pods(df, metric="cpu_mcpu", top_n=20):
     """
@@ -84,6 +85,9 @@ def update_graph(metric, top_n, graph_type):
     """
     Dynamically switch between graph types based on the selected option.
     """
+    global data
+    data = load_data()
+
     if graph_type == "lines":
         return update_graph_lines(metric, top_n)
     elif graph_type == "area_stacked":
@@ -94,67 +98,85 @@ def update_graph(metric, top_n, graph_type):
         # Default fallback (shouldn't happen with valid options)
         return {"data": [], "layout": {"title": "Invalid Graph Type"}}
 
-
 def update_graph_area_stacked(metric, top_n):
     """
     Update the graph based on the selected metric and top N pods.
-    Displays data as a stacked area chart.
+    Displays data as a stacked area chart with a 5-minute average.
     """
+    # Filter the top N pods
     filtered_data = get_top_pods(data, metric=metric, top_n=top_n)
 
-    # Ensure data is sorted by timestamp for cumulative stacking
+    # Ensure data is sorted by timestamp
+    filtered_data["timestamp"] = pd.to_datetime(filtered_data["timestamp"])
     filtered_data = filtered_data.sort_values(by="timestamp")
 
-    # Prepare the cumulative stack
-    timestamps = filtered_data["timestamp"].unique()
-    cumulative_values = pd.DataFrame(index=timestamps)
-    cumulative_values["timestamp"] = timestamps
+    # Compute 5-minute averages while preserving spikes
+    filtered_data = (
+        filtered_data.set_index("timestamp")
+        .groupby("pod_name")[metric]
+        .resample("5T")
+        .max()
+        .reset_index()
+    )
 
-    # Create traces for each pod
+    # Sort pods by the total metric to ensure the biggest consumer is on top
+    pod_totals = filtered_data.groupby("pod_name")[metric].sum().sort_values(ascending=False)
+    filtered_data["pod_name"] = pd.Categorical(filtered_data["pod_name"], categories=pod_totals.index, ordered=True)
+    filtered_data = filtered_data.sort_values(by=["timestamp", "pod_name"])
+
+    # Create area traces for each pod
     traces = []
     for pod_name, pod_data in filtered_data.groupby("pod_name"):
-        pod_values = pod_data.set_index("timestamp")[metric].reindex(timestamps, fill_value=0)
-
-        if cumulative_values.shape[1] == 1:  # First pod (no cumulative stack yet)
-            cumulative_values[pod_name] = pod_values
-        else:  # Subsequent pods add to the cumulative stack
-            cumulative_values[pod_name] = cumulative_values.iloc[:, -1] + pod_values
-
-        # Add trace for the pod
         traces.append(
             go.Scatter(
-                x=timestamps,
-                y=cumulative_values[pod_name],
-                mode="lines",
-                fill="tonexty",  # Stack on top of the previous trace
+                x=pod_data["timestamp"],
+                y=pod_data[metric],
                 name=pod_name,
                 hoverinfo="text",
                 text=[
                     f"Pod: {pod_name}<br>{metric}: {val}"
-                    for val in pod_values
-                ]
+                    for val in pod_data[metric]
+                ],
+                mode="lines",
+                stackgroup="one"
             )
         )
 
     # Configure the figure layout
     layout = go.Layout(
-        title=f"Top {top_n} Pods by {metric}",
+        title=f"Top {top_n} Pods by {metric} (5-Minute Average)",
         xaxis_title="Time",
         yaxis_title="CPU (mCPU)" if metric == "cpu_mcpu" else "Memory (MiB)",
-        hovermode="x unified",  # Unified hover for stacked areas
+        hovermode="x unified",
         template="plotly_white"
     )
 
     return {"data": traces, "layout": layout}
 
+
 # bar mode
 def update_graph_bar(metric, top_n):
     """
     Update the graph based on the selected metric and top N pods.
+    Displays data as a stacked bar chart with a 5-minute average.
     """
+    # Filter the top N pods
     filtered_data = get_top_pods(data, metric=metric, top_n=top_n)
 
-    # Create traces for each pod
+    # Ensure data is sorted by timestamp
+    filtered_data["timestamp"] = pd.to_datetime(filtered_data["timestamp"])
+    filtered_data = filtered_data.sort_values(by="timestamp")
+
+    # Compute 5-minute averages while preserving spikes
+    filtered_data = (
+        filtered_data.set_index("timestamp")
+        .groupby("pod_name")[metric]
+        .resample("5T")
+        .max()
+        .reset_index()
+    )
+
+    # Create bar traces for each pod
     traces = []
     for pod_name, pod_data in filtered_data.groupby("pod_name"):
         traces.append(
@@ -172,7 +194,7 @@ def update_graph_bar(metric, top_n):
 
     # Configure the figure layout
     layout = go.Layout(
-        title=f"Top {top_n} Pods by {metric}",
+        title=f"Top {top_n} Pods by {metric} (5-Minute Average)",
         barmode="stack",
         xaxis_title="Time",
         yaxis_title="CPU (mCPU)" if metric == "cpu_mcpu" else "Memory (MiB)",
@@ -181,7 +203,6 @@ def update_graph_bar(metric, top_n):
     )
 
     return {"data": traces, "layout": layout}
-
 
 def update_graph_lines(metric, top_n):
     """
