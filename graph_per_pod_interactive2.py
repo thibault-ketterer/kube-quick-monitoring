@@ -36,6 +36,16 @@ app.layout = html.Div([
         )
     ]),
     html.Div([
+        html.Label("Select Namespace:"),
+        dcc.Dropdown(
+            id="namespace_selector",
+            options=[],  # This will be populated dynamically based on the selected file
+            value=None,
+            placeholder="Select a namespace",
+            clearable=True,
+        )
+    ]),
+    html.Div([
         html.Label("Select Metric:"),
         dcc.Dropdown(
             id="metric",
@@ -87,19 +97,36 @@ def load_data(selected_file):
         return df
     return pd.DataFrame()
 
+# Callback to update namespace options based on selected file
+@app.callback(
+    Output("namespace_selector", "options"),
+    Input("file_selector", "value")
+)
+def update_namespace_options(selected_file):
+    df = load_data(selected_file)
+    namespaces = df["namespace"].unique() if not df.empty else []
+    return [{"label": namespace, "value": namespace} for namespace in namespaces] + [{"label": "-- ALL --", "value": ""}]
+
 # Callback to update the graph based on user inputs
 @app.callback(
     Output("pod-usage-graph", "figure"),
     Input("file_selector", "value"),
+    Input("namespace_selector", "value"),
     Input("metric", "value"),
     Input("top_n", "value"),
     Input("graph_type", "value")
 )
-def update_graph(selected_file, metric, top_n, graph_type):
+def update_graph(selected_file, namespace, metric, top_n, graph_type):
     """
     Dynamically switch between graph types based on the selected option.
     """
-    setdata(load_data(selected_file))
+    data = load_data(selected_file)
+
+    # Filter by namespace if selected
+    if namespace:
+        data = data[data["namespace"] == namespace]
+
+    setdata(data)
 
     if graph_type == "lines":
         return update_graph_lines(metric, top_n)
