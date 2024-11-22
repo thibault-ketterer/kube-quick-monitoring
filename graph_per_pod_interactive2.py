@@ -36,6 +36,7 @@ app.layout = html.Div([
             value=file_options[-1]['value'],
             placeholder="Select a date file for analysis",
             clearable=False,
+            multi=True,
         )
     ]),
     html.Div([
@@ -87,20 +88,35 @@ app.layout = html.Div([
     dcc.Graph(id="pod-usage-graph"),
 ])
 
-# Function to load data based on selected file
-def load_data(selected_file):
-    if selected_file is not None:
-        input_file = os.path.join(base_dir, selected_file)
-        # Read the CSV file
-        df = pd.read_csv(input_file)
+# Function to load data based on selected file(s)
+def load_data(selected_files):
+    if selected_files is not None:
+        # Initialize an empty DataFrame
+        combined_df = pd.DataFrame()
 
-        # Ensure timestamp is sorted for smooth plotting
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
-        df = df.sort_values(by="timestamp")
+        # If selected_files is a single file, convert it to a list
+        if isinstance(selected_files, str):
+            selected_files = [selected_files]
 
-        # Fill missing timestamp values with the last valid value
-        df["timestamp"] = df["timestamp"].ffill()
-        return df
+        # Loop through each selected file and append to combined DataFrame
+        for file in selected_files:
+            input_file = os.path.join(base_dir, file)
+            # Read the CSV file
+            df = pd.read_csv(input_file)
+
+            # Ensure timestamp is sorted for smooth plotting
+            df["timestamp"] = pd.to_datetime(df["timestamp"])
+            df = df.sort_values(by="timestamp")
+
+            # Fill missing timestamp values with the last valid value
+            df["timestamp"] = df["timestamp"].ffill()
+
+            # Append to the combined DataFrame
+            combined_df = pd.concat([combined_df, df], ignore_index=True)
+
+        # Return the combined DataFrame
+        return combined_df
+
     return pd.DataFrame()
 
 # Callback to update namespace options based on selected file
