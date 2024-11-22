@@ -47,6 +47,7 @@ app.layout = html.Div([
             value=None,
             placeholder="Select a namespace",
             clearable=True,
+            multi=True,
         )
     ]),
     html.Div([
@@ -146,7 +147,10 @@ def update_graph(selected_file, namespace, metric, top_n, graph_type):
 
     # Filter by namespace if selected
     if namespace:
-        data = data[data["namespace"] == namespace]
+        if isinstance(namespace, str):
+            data = data[data["namespace"] == namespace]
+        else:
+            data = data[data["namespace"].isin(namespace)]
 
     setdata(data)
 
