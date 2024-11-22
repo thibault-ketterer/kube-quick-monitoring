@@ -97,6 +97,9 @@ def load_data(selected_file):
         # Ensure timestamp is sorted for smooth plotting
         df["timestamp"] = pd.to_datetime(df["timestamp"])
         df = df.sort_values(by="timestamp")
+
+        # Fill missing timestamp values with the last valid value
+        df["timestamp"] = df["timestamp"].ffill()
         return df
     return pd.DataFrame()
 
