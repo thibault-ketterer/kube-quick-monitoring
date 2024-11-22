@@ -22,15 +22,18 @@ def get_available_files():
                     files.append(os.path.join(year_month, file))
     return sorted(files)
 
-# Layout for the Dash app
+# for default file selection
+file_options = [{"label": f, "value": f} for f in get_available_files()]
+
+# Layout for the Dash
 app.layout = html.Div([
     html.H1("Top Pods Resource Usage"),
     html.Div([
         html.Label("Select Date File:"),
         dcc.Dropdown(
             id="file_selector",
-            options=[{"label": f, "value": f} for f in get_available_files()],
-            value=None,
+            options=file_options,
+            value=file_options[-1]['value'],
             placeholder="Select a date file for analysis",
             clearable=False,
         )
