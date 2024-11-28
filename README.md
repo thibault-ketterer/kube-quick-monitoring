@@ -12,3 +12,5 @@ launch
 other shell
 
     python graph_per_pod_interactive2.py
+
+![screenshot of monitoring](shot.png)
