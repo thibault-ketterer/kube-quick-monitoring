@@ -3,11 +3,11 @@ This project is a simple monitoring for cpu / memory usage of your pods.
 
 It's using no tools but **python** and **kube access**
 
-it connects to your kube with the dump script and start do write some csvs
+it connects to your kube with the dump script and start to write some csvs
 
 the graph script loads the csvs and graph the usage
 
-Very handy ot have an overview of a ressource usage of a temporary kube cluster without having to install anything
+Very handy to have an overview of a ressource usage of a temporary kube cluster without having to install anything
 
 # install
 
